@@ -10,7 +10,7 @@ const AWS = require('aws-sdk');
 const Sharp = require('sharp');
 
 // set the S3 and API GW endpoints
-const BUCKET = 'images-us-east-1.echocommunity.org';
+const BUCKET = 'images-860201917227-us-east-1';
 
 exports.handler = (event, context, callback) => {
 
@@ -29,18 +29,9 @@ exports.handler = (event, context, callback) => {
     let request = event.Records[0].cf.request;
     let params = querystring.parse(request.querystring);
 
-    let original;
-    if(params.original){
-        original = params.original;
-    }else if(params.o){
-        original = params.o;
-    }
-
-    // If the original has been requested stop processing
-    // and return it.
-    if(original == 'true'){
-        callback(null, response);
-        return;
+    if(!params.w && !params.h){
+      callback(null, request);
+      return;
     }
 
     // read the required path. Ex: uri /images/100x100/webp/image.jpg

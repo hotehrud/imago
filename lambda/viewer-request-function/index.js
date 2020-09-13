@@ -15,11 +15,10 @@ const querystring = require('querystring');
 // sub.domain.tld/uuid/filename.ext?
 
 // Parameters
-// o or original = boolean (all other arguments ignored if true)
-// w or width  = integer between 50 and 4100(4k)
-// h or height = integer between 50 and 4100
-// t or transform = string value "crop" or "fit" (defaults to crop, both width and height required)
-// q or quailty = string value "l" or "low", "m" or "med" or "medium", "h" or "high"
+// w (width)  =
+// h (height) =
+// t (transform) = string value "crop" or "fit" (defaults to crop, both width and height required)
+// q (quailty) = string value "l" or "m" or "h" (low, medium, high)
 
 // If o is specified, the original image is returned
 
@@ -31,9 +30,9 @@ const querystring = require('querystring');
 // if both w and h are specified and t is fit then the image will be resized to fit within the dimensions provided.
 
 const variables = {
-        width : {min:100,max:4100,default:600},
-        height : {min:100,max:4100,default:400},
-        roundToNearest: 100,
+        allowedDimension : [ 16, 64, 240, 360, 640, 960, 1280, 1920],
+        defaultDimension : 360,
+        variance: 20,
         defaults: {quality:'m',transform:'c'},
         webpExtension: 'webp'
   };
@@ -47,74 +46,36 @@ exports.handler = (event, context, callback) => {
     // fetch the uri of original image
     let fwdUri = request.uri;
 
-    let width, height, original, transform, quality, mode;
+    let width, height, transform, quality, mode;
 
-    if(params.original){
-        original = params.original;
-    }else if(params.o){
-        original = params.o;
-    }
-
-    // If the original has been requested stop processing
-    // and return it.
-    if(original == 'true'){
+    if(!params.w && !params.h){
         callback(null, request);
         return;
     }
 
-    if(params.width){
-        width = params.width;
-    }else if(params.w){
-        width = params.w;
-    }
-
-    if(params.height){
-        height = params.height;
-    }else if(params.h){
-        height = params.h;
-    }
-    
-    // If no width or height parameters are passed, set them as defaults
-    if(!params.width && !params.height && !params.w && !params.h){
-        width = variables.width.default;
-        height = variables.height.default;
-    }
-
-    if(params.transform){
-        transform = params.transform;
-    }else if(params.t){
-        transform = params.t;
-    }
+    width = params.w;
+    height = params.h;
+    transform = params.t;
+    quality = params.q;
 
     //Limit transform methods and set default
     switch(transform){
         case "f":
-        case "fit":
             transform = "f";
             break;
         default:
-            transform = "c";
-    }
-
-    if(params.quality){
-        quality = params.quality;
-    }else if(params.q){
-        quality = params.q;
+            transform = variables.defaults.transform;
     }
 
     // Limit quality settings and set default
     switch(quality){
         case "l":
-        case "low":
             quality = "l";
             break;
         case "m":
-        case "med":
-        case "medium":
             quality = "m";
             break;
         case "h":
-        case "high":
             quality = "h";
             break;
         default:
@@ -151,13 +112,13 @@ exports.handler = (event, context, callback) => {
     // TODO: ROUND AND LIMIT WIDTH AND HEIGHT VALUES!!
     switch(mode){
         case "w":
-            url.push(round_and_limit(width, variables.width.min, variables.width.max, variables.roundToNearest));
+            url.push(matchDimension(width, variables.defaultDimension, variables.allowedDimension));
             break;
         case "h":
-            url.push(round_and_limit(height, variables.height.min, variables.height.max, variables.roundToNearest));
+            url.push(matchDimension(height, variables.defaultDimension, variables.allowedDimension));
             break;
         default:
-            url.push(round_and_limit(width, variables.width.min, variables.width.max, variables.roundToNearest)+"x"+round_and_limit(height, variables.height.min, variables.height.max, variables.roundToNearest));
+            url.push(`${matchDimension(width, variables.defaultDimension, variables.allowedDimension)}x${matchDimension(height, variables.defaultDimension, variables.allowedDimension)}`);
     }
 
     url.push(quality);
@@ -194,4 +155,24 @@ function round_and_limit(value, low_limit, high_limit, rounding_value){
     if(roundvalue > high_limit) return high_limit;
 
     return roundvalue;
+}
+
+function matchDimension(value, defaultSize, allowedDimension) {
+    let variancePercent = 0.2;
+    let matchFound = false;
+    let targetValue = value;
+
+    for (let dimension of allowedDimension) {
+        let min = dimension - (dimension * variancePercent);
+        let max = dimension + (dimension * variancePercent);
+        if(targetValue >= min && targetValue <= max){
+            targetValue = dimension;
+            matchFound = true;
+            break;
+        }
+    }
+    if (!matchFound) {
+        targetValue = defaultSize;
+    }
+    return targetValue;
 }

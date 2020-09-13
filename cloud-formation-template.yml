@@ -8,7 +8,7 @@ Resources:
     DeletionPolicy: Retain
     Properties:
       AccessControl: PublicRead
-      BucketName: images-us-east-1.echocommunity.org
+      BucketName: !Sub images-${AWS::AccountId}-${AWS::Region}
 
   ImageBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -57,7 +57,9 @@ Resources:
     Type: AWS::Serverless::Function
     DeletionPolicy: Delete
     Properties:
-      CodeUri: s3://serverless.echocommunity.org/viewer-request-function-12.zip
+      CodeUri:
+        Bucket: code-image-resize
+        Key: viewer-request-function-12.zip
       Handler: index.handler
       Runtime: nodejs12.x
       MemorySize: 128
@@ -75,7 +77,9 @@ Resources:
    Type: AWS::Serverless::Function
    DeletionPolicy: Delete
    Properties:
-     CodeUri: s3://serverless.echocommunity.org/origin-response-function-12.zip
+     CodeUri:
+       Bucket: code-image-resize
+       Key: origin-response-function-12.zip
      Handler: index.handler
      Runtime: nodejs12.x
      MemorySize: 512
@@ -111,16 +115,10 @@ Resources:
           ForwardedValues:
             QueryString: 'true'
             QueryStringCacheKeys:
-              - o
-              - original
               - w
-              - width
               - h
-              - height
               - q
-              - quality
               - t
-              - transform
             Cookies:
               Forward: 'none'
           ViewerProtocolPolicy: allow-all
